@@ -12,20 +12,12 @@ const AuthenticateCallback = () => {
 
   useEffect(() => {
     if (isLoaded && user) {
-      // Check if the user is new (createdAt === updatedAt)
       if (user.createdAt === user.updatedAt) {
-        console.log("New user detected, redirecting to onboarding...");
-        setTimeout(() => {
-          navigate("/onboarding");
-          setIsRedirecting(false);
-        }, 1000);
+        navigate("/onboarding", { replace: true });
       } else {
-        console.log("Existing user, redirecting to homepage...");
-        setTimeout(() => {
-          navigate("/");
-          setIsRedirecting(false);
-        }, 1000);
+        navigate("/", { replace: true });
       }
+      setIsRedirecting(false);
     }
   }, [user, isLoaded, navigate]);
 
