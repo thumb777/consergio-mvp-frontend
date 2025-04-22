@@ -127,7 +127,7 @@ function App() {
         <Route path="/s/:id" element={<ChatPage />} />
         <Route path="/waitlist" element={<WaitList />} />
         <Route path="/waitlist/success" element={<WaitListSuccess />} />
-        <Route path="/authenticate/*" element={<AuthenticateCallback />} />
+        <Route path="/authenticate" element={<AuthenticateCallback />} />
         <Route path="/onboarding" element={<Onboarding />} />
         <Route path="/profile" element={<UserProfile />} />
       </Routes>
