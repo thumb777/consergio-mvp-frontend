@@ -1,23 +1,24 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuthContext } from "../contexts/AuthContext";
-import authService from "../services/authService";
+import { supabase } from "../lib/supabase";
 import { UserCircle } from "lucide-react";
+import { toast } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
 
 const UserProfile = () => {
-  const { user, loading, error, signOut, isAuthenticated } = useAuthContext();
+  const { user, loading, signOut, isAuthenticated } = useAuthContext();
   const navigate = useNavigate();
   
   const [formData, setFormData] = useState({
-    firstName: "",
-    lastName: "",
-    profileImage: "",
+    fullName: "",
+    avatarUrl: "",
   });
   
   const [isEditing, setIsEditing] = useState(false);
   const [updateLoading, setUpdateLoading] = useState(false);
-  const [updateError, setUpdateError] = useState(null);
   const [deleteConfirm, setDeleteConfirm] = useState(false);
+  const [avatarFile, setAvatarFile] = useState(null);
 
   // Redirect if not authenticated
   useEffect(() => {
@@ -30,9 +31,8 @@ const UserProfile = () => {
   useEffect(() => {
     if (user) {
       setFormData({
-        firstName: user.firstName || "",
-        lastName: user.lastName || "",
-        profileImage: user.profileImage || "",
+        fullName: user.user_metadata?.full_name || "",
+        avatarUrl: user.user_metadata?.avatar_url || "",
       });
     }
   }, [user]);
@@ -42,16 +42,65 @@ const UserProfile = () => {
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
+  const handleAvatarChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      setAvatarFile(file);
+      // Create a preview URL
+      const previewUrl = URL.createObjectURL(file);
+      setFormData(prev => ({ ...prev, avatarUrl: previewUrl }));
+    }
+  };
+
+  const uploadAvatar = async (file) => {
+    try {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${user.id}-${Math.random()}.${fileExt}`;
+      const filePath = `avatars/${fileName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('avatars')
+        .upload(filePath, file);
+
+      if (uploadError) throw uploadError;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('avatars')
+        .getPublicUrl(filePath);
+
+      return publicUrl;
+    } catch (error) {
+      console.error('Error uploading avatar:', error);
+      throw error;
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setUpdateLoading(true);
-    setUpdateError(null);
     
     try {
-      await authService.updateUserProfile(user.id, formData);
+      let avatarUrl = formData.avatarUrl;
+
+      // If there's a new avatar file, upload it
+      if (avatarFile) {
+        avatarUrl = await uploadAvatar(avatarFile);
+      }
+
+      const { error } = await supabase.auth.updateUser({
+        data: {
+          full_name: formData.fullName,
+          avatar_url: avatarUrl,
+        }
+      });
+
+      if (error) throw error;
+
+      toast.success("Profile updated successfully!");
       setIsEditing(false);
-    } catch (err) {
-      setUpdateError(err.message || "Failed to update profile");
+    } catch (error) {
+      console.error('Error updating profile:', error);
+      toast.error(error.message || "Failed to update profile");
     } finally {
       setUpdateLoading(false);
     }
@@ -64,11 +113,18 @@ const UserProfile = () => {
     }
     
     try {
-      await authService.deleteUserAccount(user.id);
+      // Delete user's data from Supabase
+      const { error } = await supabase.rpc('delete_user_data');
+      if (error) throw error;
+
+      // Sign out the user
       await signOut();
       navigate("/");
-    } catch (err) {
-      setUpdateError(err.message || "Failed to delete account");
+      toast.success("Account deleted successfully");
+    } catch (error) {
+      console.error('Error deleting account:', error);
+      toast.error(error.message || "Failed to delete account");
+      setDeleteConfirm(false);
     }
   };
 
@@ -76,14 +132,6 @@ const UserProfile = () => {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="w-12 h-12 rounded-full border-4 border-neutral-200 border-t-neutral-800 animate-spin" />
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-red-500">Error: {error}</div>
       </div>
     );
   }
@@ -96,15 +144,34 @@ const UserProfile = () => {
             <h1 className="text-2xl font-bold text-gray-900">Your Profile</h1>
             
             {/* Profile Image */}
-            <div className="mt-4 flex justify-center">
-              {user?.profileImage ? (
+            <div className="mt-4 flex flex-col items-center">
+              {formData.avatarUrl ? (
                 <img
-                  src={user.profileImage}
+                  src={formData.avatarUrl}
                   alt="Profile"
                   className="h-24 w-24 rounded-full object-cover"
                 />
               ) : (
                 <UserCircle className="h-24 w-24 text-gray-400" />
+              )}
+              
+              {isEditing && (
+                <div className="mt-2">
+                  <label className="block text-sm font-medium text-gray-700">
+                    Change Profile Picture
+                  </label>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleAvatarChange}
+                    className="mt-1 block w-full text-sm text-gray-500
+                      file:mr-4 file:py-2 file:px-4
+                      file:rounded-full file:border-0
+                      file:text-sm file:font-semibold
+                      file:bg-[#0D5445] file:text-white
+                      hover:file:bg-[#0A3F34]"
+                  />
+                </div>
               )}
             </div>
             
@@ -115,52 +182,29 @@ const UserProfile = () => {
           {isEditing ? (
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
-                <label htmlFor="firstName" className="block text-sm font-medium text-gray-700">
-                  First Name
+                <label className="block text-sm font-medium text-gray-700">
+                  Full Name
                 </label>
                 <input
                   type="text"
-                  id="firstName"
-                  name="firstName"
-                  value={formData.firstName}
+                  name="fullName"
+                  value={formData.fullName}
                   onChange={handleChange}
                   className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-[#0D5445] focus:ring-[#0D5445] sm:text-sm"
                 />
               </div>
               
-              <div>
-                <label htmlFor="lastName" className="block text-sm font-medium text-gray-700">
-                  Last Name
-                </label>
-                <input
-                  type="text"
-                  id="lastName"
-                  name="lastName"
-                  value={formData.lastName}
-                  onChange={handleChange}
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-[#0D5445] focus:ring-[#0D5445] sm:text-sm"
-                />
-              </div>
-              
-              <div>
-                <label htmlFor="profileImage" className="block text-sm font-medium text-gray-700">
-                  Profile Image URL
-                </label>
-                <input
-                  type="text"
-                  id="profileImage"
-                  name="profileImage"
-                  value={formData.profileImage}
-                  onChange={handleChange}
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-[#0D5445] focus:ring-[#0D5445] sm:text-sm"
-                />
-              </div>
-              
-              {updateError && (
-                <div className="text-red-500 text-sm">{updateError}</div>
-              )}
-              
-              <div className="flex justify-end space-x-3">
+              <div className="flex justify-between pt-4">
+                <button
+                  type="submit"
+                  disabled={updateLoading}
+                  className={`px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-[#0D5445] hover:bg-[#0A3F34] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#0D5445] ${
+                    updateLoading ? 'opacity-50 cursor-not-allowed' : ''
+                  }`}
+                >
+                  {updateLoading ? 'Saving...' : 'Save Changes'}
+                </button>
+                
                 <button
                   type="button"
                   onClick={() => setIsEditing(false)}
@@ -168,25 +212,15 @@ const UserProfile = () => {
                 >
                   Cancel
                 </button>
-                <button
-                  type="submit"
-                  disabled={updateLoading}
-                  className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-[#0D5445] hover:bg-[#0A3F34] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#0D5445]"
-                >
-                  {updateLoading ? "Saving..." : "Save Changes"}
-                </button>
               </div>
             </form>
           ) : (
             <div className="space-y-4">
               <div>
-                <h2 className="text-sm font-medium text-gray-500">First Name</h2>
-                <p className="mt-1 text-sm text-gray-900">{user?.firstName || "Not set"}</p>
-              </div>
-              
-              <div>
-                <h2 className="text-sm font-medium text-gray-500">Last Name</h2>
-                <p className="mt-1 text-sm text-gray-900">{user?.lastName || "Not set"}</p>
+                <h2 className="text-sm font-medium text-gray-500">Full Name</h2>
+                <p className="mt-1 text-sm text-gray-900">
+                  {user?.user_metadata?.full_name || "Not set"}
+                </p>
               </div>
               
               <div className="pt-4 flex justify-between">
@@ -208,20 +242,18 @@ const UserProfile = () => {
           )}
           
           {/* Delete Account Section */}
-          <div className="mt-8 pt-6 border-t border-gray-200">
-            <h3 className="text-lg font-medium text-gray-900">Danger Zone</h3>
+          <div className="mt-8 pt-8 border-t border-gray-200">
+            <h2 className="text-lg font-medium text-red-600">Danger Zone</h2>
             <p className="mt-1 text-sm text-gray-500">
-              Once you delete your account, there is no going back. Please be certain.
+              Once you delete your account, it cannot be recovered.
             </p>
             <button
               onClick={handleDeleteAccount}
-              className={`mt-4 px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white ${
-                deleteConfirm 
-                  ? "bg-red-600 hover:bg-red-700" 
-                  : "bg-red-500 hover:bg-red-600"
-              } focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500`}
+              className={`mt-4 px-4 py-2 border border-red-600 rounded-md shadow-sm text-sm font-medium text-red-600 hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 ${
+                deleteConfirm ? 'bg-red-600 text-white hover:bg-red-700' : ''
+              }`}
             >
-              {deleteConfirm ? "Confirm Delete Account" : "Delete Account"}
+              {deleteConfirm ? 'Click again to confirm' : 'Delete Account'}
             </button>
           </div>
         </div>

@@ -1,40 +1,33 @@
-import { useEffect, useState } from "react";
-import { useAuth, AuthenticateWithRedirectCallback } from "@clerk/clerk-react";
+import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import Loading from "../components/Loading";
+import AuthLoading from "../components/Authloading";
 import { useAuthContext } from "../contexts/AuthContext";
+import { supabase } from "../lib/supabase";
 
 const AuthenticateCallback = () => {
-  const { user, isLoaded } = useAuth();
-  const { loading } = useAuthContext();
+  const { user } = useAuthContext();
   const navigate = useNavigate();
-  const [isRedirecting, setIsRedirecting] = useState(true);
 
   useEffect(() => {
-    if (isLoaded && user) {
-      // Check if the user is new (createdAt === updatedAt)
-      if (user.createdAt === user.updatedAt) {
-        console.log("New user detected, redirecting to onboarding...");
-        setTimeout(() => {
-          navigate("/onboarding");
-          setIsRedirecting(false);
-        }, 1000);
-      } else {
-        console.log("Existing user, redirecting to homepage...");
-        setTimeout(() => {
-          navigate("/");
-          setIsRedirecting(false);
-        }, 1000);
+    const handleAuthCallback = async () => {
+      const { data: { session }, error } = await supabase.auth.getSession();
+      
+      if (error) {
+        console.error("Auth error:", error);
+        navigate("/");
+        return;
       }
-    }
-  }, [user, isLoaded, navigate]);
 
-  return (
-    <>
-      {(loading || isRedirecting) && <Loading isLoading={true} />}
-      <AuthenticateWithRedirectCallback />
-    </>
-  );
+      if (session) {
+        // You can add additional logic here if needed
+        navigate("/");
+      }
+    };
+
+    handleAuthCallback();
+  }, [navigate]);
+
+  return <AuthLoading isLoading={true} />;
 };
 
 export default AuthenticateCallback;

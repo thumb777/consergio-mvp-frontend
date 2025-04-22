@@ -1,71 +1,59 @@
 import { createContext, useContext, useState, useEffect } from "react";
-import { useAuth as useClerkAuth, useUser } from "@clerk/clerk-react";
-import authService from "../services/authService";
+import { supabase } from "../lib/supabase";
 
 const AuthContext = createContext(null);
 
 export const AuthProvider = ({ children }) => {
-  const { isSignedIn, isLoaded: clerkLoaded, signOut } = useClerkAuth();
-  const { user: clerkUser } = useUser();
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // Sync user data with our database when Clerk auth state changes
   useEffect(() => {
-    const syncUserWithDatabase = async () => {
-      if (!clerkLoaded) return;
-      
-      try {
-        if (isSignedIn && clerkUser) {
-          // User is signed in, sync with our database
-          const userData = await authService.syncUser({
-            id: clerkUser.id,
-            email: clerkUser.emailAddresses[0]?.emailAddress || null,
-            firstName: clerkUser.firstName || null,
-            lastName: clerkUser.lastName || null,
-            profileImage: clerkUser.imageUrl || null,
-          });
-          
-          setUser(userData);
-        } else {
-          // User is signed out
-          setUser(null);
-        }
-      } catch (err) {
-        console.error("Error syncing user with database:", err);
-        setError(err.message || "Authentication error");
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    syncUserWithDatabase();
-  }, [isSignedIn, clerkUser, clerkLoaded]);
-
-  // Custom sign out that handles both Clerk and our database
-  const handleSignOut = async () => {
-    try {
-      setLoading(true);
-      await signOut();
-      setUser(null);
-    } catch (err) {
-      setError(err.message || "Error signing out");
-    } finally {
+    // Get initial session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUser(session?.user ?? null);
       setLoading(false);
+    });
+
+    // Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null);
+      setLoading(false);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  const signInWithGoogle = async () => {
+    try {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: `${window.location.origin}/authenticate`
+        }
+      });
+      if (error) throw error;
+    } catch (err) {
+      setError(err.message);
+      console.error("Error signing in with Google:", err);
     }
   };
 
-  // Check if user is new (just registered)
-  const isNewUser = () => {
-    if (!clerkUser) return false;
-    
-    // Check if created and updated timestamps are close (within 5 minutes)
-    const createdAt = new Date(clerkUser.createdAt).getTime();
-    const updatedAt = new Date(clerkUser.updatedAt).getTime();
-    const fiveMinutesInMs = 5 * 60 * 1000;
-    
-    return Math.abs(updatedAt - createdAt) < fiveMinutesInMs;
+  const signOut = async () => {
+    try {
+      const { error } = await supabase.auth.signOut();
+      if (error) throw error;
+      
+      // Clear all auth-related state
+      setUser(null);
+      setError(null);
+      
+      // You might want to redirect to home page here
+      window.location.href = '/';
+    } catch (err) {
+      setError(err.message);
+      console.error("Error signing out:", err);
+    }
   };
 
   const value = {
@@ -73,8 +61,8 @@ export const AuthProvider = ({ children }) => {
     loading,
     error,
     isAuthenticated: !!user,
-    isNewUser: isNewUser(),
-    signOut: handleSignOut,
+    signInWithGoogle,
+    signOut
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

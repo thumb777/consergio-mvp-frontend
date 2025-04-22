@@ -1,18 +1,17 @@
-import { useAuth, useUser } from "@clerk/clerk-react";
 import { UserCircle } from "lucide-react";
+import { useAuthContext } from "../contexts/AuthContext";
 
 const Footer = () => {
-  const { isSignedIn, signOut } = useAuth(); // Clerk hooks for auth status and sign-out
-  const { user } = useUser(); // Clerk hook to get the signed-in user
+  const { isAuthenticated, user, signOut } = useAuthContext();
 
   return (
     <footer className="w-full fixed bottom-0 bg-gray-100 py-4 flex justify-center">
-      {isSignedIn ? (
+      {isAuthenticated ? (
         <div className="flex items-center gap-4">
           {/* User Profile Picture */}
-          {user?.profileImageUrl ? (
+          {user?.user_metadata?.avatar_url ? (
             <img
-              src={user.profileImageUrl}
+              src={user.user_metadata.avatar_url}
               alt="User Avatar"
               className="h-8 w-8 rounded-full"
             />
@@ -21,7 +20,9 @@ const Footer = () => {
           )}
 
           {/* User Name */}
-          <p className="text-gray-700">{user?.firstName || "User"}</p>
+          <p className="text-gray-700">
+            {user?.user_metadata?.full_name || user?.email || "User"}
+          </p>
 
           {/* Sign Out Button */}
           <button

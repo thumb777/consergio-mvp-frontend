@@ -10,9 +10,9 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@clerk/clerk-react": "^5.24.1",
     "@googleapis/calendar": "^9.8.0",
     "@react-oauth/google": "^0.12.1",
+    "@supabase/supabase-js": "^2.49.4",
     "aos": "^2.3.4",
     "axios": "^1.7.9",
     "framer-motion": "^12.4.2",

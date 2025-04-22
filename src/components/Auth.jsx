@@ -1,29 +1,23 @@
-import { useSignIn } from "@clerk/clerk-react";
-import { Apple, X } from "lucide-react";
+import { X } from "lucide-react";
 import { useState } from "react";
+import { useAuthContext } from "../contexts/AuthContext";
 
 const Auth = ({ onComplete, onClose }) => {
-  const { signIn, isLoaded } = useSignIn();
-  const [isLoading, setIsLoading] = useState(false); // Manage loading state
-  const [error, setError] = useState(null); // Manage error state
+  const { signInWithGoogle } = useAuthContext();
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState(null);
 
-  const handleAuth = async (provider) => {
-    if (!isLoaded) return;
-
-    setIsLoading(true); // Show loading state
-    setError(null); // Reset error state
-
+  const handleGoogleAuth = async () => {
+    setIsLoading(true);
+    setError(null);
     try {
-      await signIn.authenticateWithRedirect({
-        strategy: provider,
-        redirectUrl: `${window.location.origin}/authenticate`, // Redirect to the callback route
-      });
-      onComplete(); // Notify parent component on success
+      await signInWithGoogle();
+      onComplete();
     } catch (error) {
       console.error("Authentication failed:", error);
-      setError("Authentication failed. Please try again."); // Set error message
+      setError("Authentication failed. Please try again.");
     } finally {
-      setIsLoading(false); // Reset loading state
+      setIsLoading(false);
     }
   };
 
@@ -55,8 +49,8 @@ const Auth = ({ onComplete, onClose }) => {
         {/* Auth Buttons */}
         <div className="space-y-4">
           <button
-            onClick={() => handleAuth("oauth_google")}
-            disabled={isLoading} // Disable button when loading
+            onClick={handleGoogleAuth}
+            disabled={isLoading}
             className={`w-full flex items-center justify-center px-4 py-3 border-2 border-gray-200 rounded-2xl text-base font-medium ${
               isLoading
                 ? "bg-gray-200 text-gray-500 cursor-not-allowed"
@@ -69,19 +63,6 @@ const Auth = ({ onComplete, onClose }) => {
               alt="Google logo"
             />
             {isLoading ? "Loading..." : "Continue with Google"}
-          </button>
-
-          <button
-            onClick={() => handleAuth("oauth_apple")}
-            disabled={isLoading} // Disable button when loading
-            className={`w-full flex items-center justify-center px-4 py-3 border-2 border-gray-200 rounded-2xl text-base font-medium ${
-              isLoading
-                ? "bg-gray-200 text-gray-500 cursor-not-allowed"
-                : "text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#0D5445]"
-            } transition-all duration-200`}
-          >
-            <Apple className="h-5 w-5 mr-3" />
-            {isLoading ? "Loading..." : "Continue with Apple"}
           </button>
         </div>
 

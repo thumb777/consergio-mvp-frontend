@@ -4,7 +4,7 @@ import { Sparkles, Play, Square } from "lucide-react";
 import EventCards from "../components/EventCards";
 import Loading from "../components/Loading";
 import Auth from "../components/Auth";
-import { useAuth, useUser } from "@clerk/clerk-react";
+import { useAuthContext } from "../contexts/AuthContext";
 import "../App.css";
 import axios from "axios";
 import { motion } from "framer-motion";
@@ -17,10 +17,8 @@ function Home() {
   const [isLoading, setIsLoading] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [events, setEvents] = useState([]);
-  const [userData, setUserData] = useState(null); // Store authenticated user data
   const navigate = useNavigate();
-  const { isSignedIn, getToken } = useAuth(); // Clerk hooks for auth
-  const { user } = useUser(); // Clerk hook to fetch the user object
+  const { user, isAuthenticated } = useAuthContext();
   const textareaRef = useRef(null);
 
   useEffect(() => {
@@ -51,49 +49,6 @@ function Home() {
     }
   };
 
-  // Detect when the user signs in (after redirect) and fetch their data
-  useEffect(() => {
-    const fetchUserData = async () => {
-      try {
-        const token = await getToken();
-        // const response = await fetch("https://api.clerk.dev/v1/users", {
-        //   headers: {
-        //     Authorization: `Bearer ${token}`,
-        //   },
-        // });
-        // const user = await response.json();
-        console.log("Sign-in successful", user.fullName, user.imageUrl, user.emailAddresses[0].emailAddress,);
-        const saveUserToDatabase = async (user) => {
-          try {
-            // Send user data to your backend using axios
-            const response = await axios.post(`${import.meta.env.VITE_BASE_URL}/auth/userRegister`, {
-              id: user.id,
-              email: user.emailAddresses[0]?.emailAddress || null,
-              firstName: user.firstName || null,
-              lastName: user.lastName || null,
-              profileImage: user.imageUrl || null,
-            });
-    
-            console.log("User data successfully saved to the database.");
-          } catch (error) {
-            console.error("Error saving user data:", error);
-          }
-        };
-        saveUserToDatabase(user);
-    
-
-        setUserData(user); // Store the user data
-        setIsModalOpen(false); // Close the modal
-      } catch (error) {
-        console.error("Failed to fetch user data:", error);
-      }
-    };
-
-    if (isSignedIn && !userData) {
-      fetchUserData(); // Fetch user data if signed in
-    }
-  }, [isSignedIn, getToken, userData]);
-
   const toggleCategory = (category) => {
     setSelectedCategories((prev) =>
       prev.includes(category)
@@ -105,7 +60,7 @@ function Home() {
   const togglePlay = async () => {
     if (!message.trim()) return;
 
-    if (!isSignedIn) {
+    if (!isAuthenticated) {
       // If user is not authenticated, open the Auth modal
       setIsModalOpen(true);
       return;
@@ -130,7 +85,6 @@ function Home() {
   };
 
   const handleAuthComplete = () => {
-    // This function will be called after the Auth modal is closed (optional)
     setIsModalOpen(false); // Close the modal
   };
 
@@ -233,7 +187,7 @@ function Home() {
             className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4"
             onClick={() => setIsModalOpen(false)}
           >
-            <Auth onComplete={handleAuthComplete} />
+            <Auth onComplete={handleAuthComplete} onClose={() => setIsModalOpen(false)} />
           </div>
         )}
       </div>

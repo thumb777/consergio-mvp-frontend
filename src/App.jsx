@@ -25,6 +25,11 @@ function App() {
     setShowLogoutMenu(!showLogoutMenu);
   };
 
+  const handleSignOut = async () => {
+    await signOut();
+    setShowLogoutMenu(false);
+  };
+
   // Close the logout menu when clicking outside
   useEffect(() => {
     const handleOutsideClick = (event) => {
@@ -58,19 +63,19 @@ function App() {
               onClick={toggleLogoutMenu} 
               className="flex items-center gap-2 cursor-pointer"
             >
-              {user?.profileImage ? (
+              {user?.user_metadata?.avatar_url ? (
                 <img
-                  src={user.profileImage}
+                  src={user.user_metadata.avatar_url}
                   alt="Profile"
                   className="w-8 h-8 rounded-full"
                 />
               ) : (
                 <div className="w-8 h-8 rounded-full bg-[#0D5445] text-white flex items-center justify-center">
-                  {user?.firstName?.charAt(0) || user?.email?.charAt(0) || "U"}
+                  {user?.user_metadata?.full_name?.charAt(0) || user?.email?.charAt(0) || "U"}
                 </div>
               )}
               <span className="hidden md:inline">
-                {user?.firstName || "Profile"}
+                {user?.user_metadata?.full_name || user?.email?.split('@')[0] || "User"}
               </span>
               
               {/* Dropdown arrow indicator */}
@@ -100,7 +105,7 @@ function App() {
           )}
           
           {/* Logout Menu */}
-          {showLogoutMenu && (
+          {showLogoutMenu && isAuthenticated && (
             <div 
               ref={logoutMenuRef}
               className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-10"
@@ -112,7 +117,7 @@ function App() {
                 View Profile
               </a>
               <button
-                onClick={signOut}
+                onClick={handleSignOut}
                 className="block w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-gray-100"
               >
                 Sign Out
