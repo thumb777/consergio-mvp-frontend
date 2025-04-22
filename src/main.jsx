@@ -16,8 +16,9 @@ createRoot(document.getElementById("root")).render(
   <StrictMode>
     <BrowserRouter>
       <ClerkProvider 
-        publishableKey={PUBLISHABLE_KEY} 
-        afterSignOutUrl="https://consergio-mvp-frontend.vercel.app/">
+        publishableKey={PUBLISHABLE_KEY}
+        navigate={(to) => window.location.href = to}
+      >
         <AuthProvider>
           <App />
         </AuthProvider>
