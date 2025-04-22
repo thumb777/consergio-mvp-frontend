@@ -128,13 +128,13 @@ function App() {
       </header>
 
       <Routes>
-        <Route path="/" element={<Home />} />
-        <Route path="/s/:id" element={<ChatPage />} />
-        <Route path="/waitlist" element={<WaitList />} />
-        <Route path="/waitlist/success" element={<WaitListSuccess />} />
-        <Route path="/authenticate" element={<AuthenticateCallback />} />
-        <Route path="/onboarding" element={<Onboarding />} />
-        <Route path="/profile" element={<UserProfile />} />
+        <Route path="/" exact={true} element={<Home />} />
+        <Route path="/s/:id" exact={true} element={<ChatPage />} />
+        <Route path="/waitlist" exact={true} element={<WaitList />} />
+        <Route path="/waitlist/success" exact={true} element={<WaitListSuccess />} />
+        <Route path="/authenticate" exact={true} element={<AuthenticateCallback />} />
+        <Route path="/onboarding" exact={true} element={<Onboarding />} />
+        <Route path="/profile" exact={true} element={<UserProfile />} />
       </Routes>
 
       {isAuthModalOpen && (
